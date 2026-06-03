@@ -1,166 +1,153 @@
 #!/usr/bin/env python3
 """
-Setup and Run Script for the Multi-Agent Stock Analysis System
+Setup and Run Script for the React + FastAPI Stock Analysis System
 
-This script automates the setup process for the stock analysis application.
-It performs the following checks and actions:
-1. Verifies Python version compatibility.
-2. Checks for and installs required Python packages from requirements.txt.
-3. Validates the .env file for API key configuration, creating it from .env.example if needed.
-4. Launches the main Streamlit application (unified_stock_analysis_app.py).
-
-Designed to provide a smooth startup experience for users.
+This script automates the installation and run process for the new architecture:
+1. Installs backend dependencies from api/requirements.txt.
+2. Performs Node package installation via pnpm install.
+3. Launches the FastAPI uvicorn backend on port 8000.
+4. Launches the Vite React frontend via pnpm dev on port 5173.
 """
 
 import sys
+import os
 import subprocess
+import time
 import importlib.util
 from pathlib import Path
 
-
-
 def check_package_installed(package_name: str) -> bool:
-    """Checks if a specific Python package is installed in the current environment."""
+    """Checks if a specific Python package is installed."""
     spec = importlib.util.find_spec(package_name)
     return spec is not None
 
-def install_requirements() -> bool:
-    """Installs all packages listed in the requirements.txt file."""
-    requirements_file = Path(__file__).parent / "requirements.txt"
-    
-    if not requirements_file.exists():
-        print("❌ Error: requirements.txt not found.")
+def install_python_requirements() -> bool:
+    """Installs all backend requirements from api/requirements.txt."""
+    req_file = Path(__file__).parent / "api" / "requirements.txt"
+    if not req_file.exists():
+        print("❌ Error: api/requirements.txt not found.")
         return False
     
-    print("📦 Installing required packages...")
+    print("📦 Installing python backend packages...")
     try:
         subprocess.check_call([
-            sys.executable, "-m", "pip", "install", "-r", str(requirements_file)
+            sys.executable, "-m", "pip", "install", "-r", str(req_file)
         ])
-        print("✅ Packages installed successfully.")
+        print("✅ Python packages installed successfully.")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"❌ Error installing packages: {e}")
+        print(f"❌ Error installing Python packages: {e}")
         return False
-
-def check_env_file() -> bool:
-    """Validates the .env file for Alpha Vantage API key configuration.
-    If .env is missing, it attempts to create it from .env.example.
-    Returns True if configured, False otherwise.
-    """
-    env_file = Path(__file__).parent / ".env"
-    
-    if not env_file.exists():
-        print("⚠️  Warning: .env file not found.")
-        print("   Creating .env file from template...")
-        
-        env_example = Path(__file__).parent / ".env.example"
-        if env_example.exists():
-            with open(env_example, 'r') as src, open(env_file, 'w') as dst:
-                content = src.read()
-                dst.write(content)
-            print("✅ .env file created from template.")
-            print("⚠️  Please edit .env file and add your Alpha Vantage API key.")
-            return False
-        else:
-            print("❌ Error: .env.example template not found.")
-            return False
-    
-    # Check if API key is configured
-    with open(env_file, 'r') as f:
-        content = f.read()
-        if "your_api_key_here" in content or "ALPHA_VANTAGE_API_KEY=" not in content:
-            print("⚠️  Warning: Alpha Vantage API key not configured in .env file.")
-            print("   Please edit .env file and add your API key.")
-            print("   Get free API key at: https://www.alphavantage.co/support/#api-key")
-            return False
-    
-    print("✅ Environment configuration found.")
-    return True
 
 def check_dependencies() -> bool:
-    """Verifies that all core dependencies for the application are installed."""
-    required_packages = [
-        'streamlit',
-        'pandas', 
-        'plotly',
-        'requests',
-        'python-dotenv'
-    ]
-    
-    missing_packages = []
-    for package in required_packages:
-        if not check_package_installed(package):
-            missing_packages.append(package)
-    
-    if missing_packages:
-        print(f"⚠️  Missing packages: {', '.join(missing_packages)}")
+    required = ['fastapi', 'uvicorn', 'requests', 'pandas', 'dotenv']
+    missing = [pkg for pkg in required if not check_package_installed(pkg)]
+    if missing:
+        print(f"⚠️ Missing packages: {', '.join(missing)}")
         return False
-    
-    print("✅ All required packages are installed.")
     return True
 
-def run_application() -> bool:
-    """Launches the main Streamlit application (unified_stock_analysis_app.py).
-    Handles user interruption (Ctrl+C) gracefully.
-    """
-    app_file = Path(__file__).parent / "unified_stock_analysis_app.py"
+def install_pnpm_packages() -> bool:
+    """Checks if node_modules exists, otherwise installs pnpm dependencies."""
+    node_modules = Path(__file__).parent / "node_modules"
+    if node_modules.exists():
+        print("✅ node_modules found. Skipping package installation.")
+        return True
     
-    if not app_file.exists():
-        print("❌ Error: unified_stock_analysis_app.py not found.")
-        return False
-    
-    print("🚀 Launching Multi-Agent Stock Analysis System...")
-    print("   The application will open in your default web browser.")
-    print("   Press Ctrl+C to stop the application.")
-    print("\n" + "="*60)
-    
+    print("📦 Installing frontend dependencies using pnpm...")
     try:
-        subprocess.run([
-            sys.executable, "-m", "streamlit", "run", str(app_file)
-        ])
-    except KeyboardInterrupt:
-        print("\n\n🛑 Application stopped by user.")
-    except Exception as e:
-        print(f"❌ Error running application: {e}")
+        # Run pnpm install
+        subprocess.check_call("pnpm install", shell=True)
+        print("✅ Frontend packages installed successfully.")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error installing frontend packages via pnpm: {e}")
         return False
+
+def run_development_servers():
+    """Runs FastAPI and Vite dev servers concurrently."""
+    print("\n🚀 Launching Development Environment...")
+    print("   FastAPI backend will run on: http://localhost:8000")
+    print("   Vite React frontend will run on: http://localhost:5173")
+    print("   Press Ctrl+C to stop both servers.")
+    print("="*60 + "\n")
     
-    return True
+    processes = []
+    try:
+        # Start FastAPI
+        backend_cmd = [sys.executable, "-m", "uvicorn", "api.index:app", "--port", "8000", "--reload"]
+        backend_process = subprocess.Popen(
+            backend_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        processes.append(backend_process)
+        print("🔥 Starting FastAPI backend (Uvicorn)...")
+        time.sleep(1.5)
+        
+        # Start Frontend using pnpm dev
+        frontend_process = subprocess.Popen(
+            "pnpm dev",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        processes.append(frontend_process)
+        print("🔥 Starting React frontend (Vite via pnpm dev)...")
+        
+        # Wait and read logs from processes
+        print("\n💡 Servers running. Logs will stream below:\n")
+        
+        # Non-blocking log printer for active console checking
+        while True:
+            # Check backend output
+            if backend_process.poll() is not None:
+                print("❌ Backend server stopped unexpectedly.")
+                break
+            if frontend_process.poll() is not None:
+                print("❌ Frontend dev server stopped unexpectedly.")
+                break
+                
+            time.sleep(1)
+            
+    except KeyboardInterrupt:
+        print("\n\n🛑 Stopping development servers...")
+    except Exception as e:
+        print(f"❌ Execution error: {e}")
+    finally:
+        # Terminate all launched processes
+        for p in processes:
+            try:
+                p.terminate()
+                p.wait(timeout=3)
+            except Exception:
+                try:
+                    p.kill()
+                except Exception:
+                    pass
+        print("✅ Clean shutdown complete.")
 
 def main():
-    """Orchestrates the setup checks and application launch sequence."""
-    print("🤖 Multi-Agent Stock Analysis System - Setup & Run")
+    print("🤖 AI Stock Analysis System - Modern Migration Setup")
     print("="*60)
     
-    
-    # Check dependencies
+    # 1. Install/Check Python backend requirements
     if not check_dependencies():
-        print("\n📦 Installing missing dependencies...")
-        if not install_requirements():
-            print("❌ Failed to install dependencies. Please install manually:")
-            print("   pip install -r requirements.txt")
+        if not install_python_requirements():
+            print("❌ Failed to resolve python backend requirements.")
             return
-    
-    # Check environment configuration
-    if not check_env_file():
-        print("\n⚠️  Please configure your .env file before running the application.")
-        print("\nSteps to configure:")
-        print("1. Get free API key: https://www.alphavantage.co/support/#api-key")
-        print("2. Edit .env file and replace 'your_api_key_here' with your actual API key")
-        print("3. Run this script again")
+            
+    # 2. Check Node packages
+    if not install_pnpm_packages():
+        print("❌ Failed to resolve frontend packages. Make sure 'pnpm' is installed and path-accessible.")
         return
-    
-    print("\n✅ All checks passed! Ready to launch application.")
-    print("\nFeatures available:")
-    print("• 💬 Natural Language Stock Queries")
-    print("• 📊 Interactive Stock Visualizations")
-    print("• 📰 Real-time News Analysis")
-    print("• 🤖 Multi-Agent Architecture")
-    
-    input("\nPress Enter to launch the application...")
-    
-    # Run the application
-    run_application()
+        
+    # 3. Run development servers concurrently
+    run_development_servers()
 
 if __name__ == "__main__":
     main()
