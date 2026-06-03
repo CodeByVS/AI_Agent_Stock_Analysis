@@ -58,7 +58,15 @@ MOCK_NEWS = {
 }
 
 def generate_mock_historical(ticker: str, days: int = 30) -> list:
-    base_price = MOCK_STOCK_DATA.get(ticker, {"price": 150.0})["price"]
+    ticker = ticker.upper()
+    if ticker in MOCK_STOCK_DATA:
+        base_price = MOCK_STOCK_DATA[ticker]["price"]
+    else:
+        seed_val = sum(ord(c) for c in ticker)
+        import random
+        random.seed(seed_val)
+        base_price = random.uniform(10.0, 500.0)
+        
     import random
     random.seed(hash(ticker)) # Consistent mock data
     
